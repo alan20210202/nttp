@@ -1,0 +1,189 @@
+package nttp
+
+import (
+	"encoding/binary"
+	"fmt"
+	"io"
+	"log"
+	"net"
+	"strconv"
+)
+
+const (
+	socks5   = 0x05
+	reserved = 0x00
+
+	methodNoAuth           = 0x00
+	methodUsernamePassword = 0x02 // This is actually not used...
+	methodNotAcceptable    = 0xFF
+
+	commandConnect   = 0x01
+	commandBind      = 0x02 // TODO: Support this
+	commandAssociate = 0x03 // 		 and this as well!
+
+	replySuccess             = 0x00
+	replyGeneralFailure      = 0x01
+	replyAddressNotSupported = 0x08
+	replyCommandNotSupported = 0x07
+
+	addressIPv4       = 0x01
+	addressDomainName = 0x03
+	addressIPv6       = 0x04
+)
+
+func hasMethod(msg []byte, method byte) bool {
+	n := int(msg[1])
+	for _, m := range msg[2 : 2+n] {
+		if m == method {
+			return true
+		}
+	}
+	return false
+}
+
+func pipeBetween(a io.ReadWriter, b io.ReadWriter) {
+	done := make(chan bool, 2)
+	go func() { _, _ = io.Copy(a, b); done <- true }()
+	go func() { _, _ = io.Copy(b, a); done <- true }()
+	<-done
+}
+
+func Close(c io.Closer) {
+	err := c.Close()
+	if err != nil {
+		log.Println("Error when closing reader:", err)
+	}
+}
+
+func ListenAsClient(local, server string) {
+	l, err := net.Listen("tcp", local)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	defer Close(l)
+	for {
+		connLocal, err := l.Accept()
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		go func() {
+			defer Close(connLocal)
+			log.Println("Accepted socks client connection from", connLocal.RemoteAddr().String())
+			connServer, err := net.Dial("tcp", server)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			defer Close(connServer)
+			log.Println("Begin piping from", connLocal.RemoteAddr().String(), "to", connServer.RemoteAddr().String())
+			pipeBetween(connLocal, newNTTReadWriter(connServer))
+			log.Println("Done with", connLocal.RemoteAddr().String())
+		}()
+	}
+}
+
+func ListenAsServer(addr string) {
+	l, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	defer Close(l)
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		go func() {
+			log.Println("Accepted socks relay connection from", conn.RemoteAddr().String())
+			defer Close(conn)
+			handleSocks5Conn(conn)
+		}()
+	}
+}
+
+func handleSocks5Conn(conn net.Conn) {
+	buf := make([]byte, 2*BlockDataSize)
+	s := newNTTReadWriter(conn)
+	// Checks the greeting message from the client
+	n, err := s.Read(buf)
+	if err == nil {
+		if n < 3 {
+			err = fmt.Errorf("greeting message too short")
+		} else if buf[0] != socks5 {
+			err = fmt.Errorf("not SOCKS5 protocol")
+		}
+	}
+	if err != nil {
+		log.Println("Failed to greet with client", conn.RemoteAddr(), ":", err)
+		return
+	}
+
+	// We use no auth by default
+	if !hasMethod(buf, methodNoAuth) {
+		log.Println("No proper methods for request from", conn.RemoteAddr())
+		_, _ = s.Write([]byte{socks5, methodNotAcceptable})
+		return
+	}
+
+	// And we send our method selection message
+	_, err = s.Write([]byte{socks5, methodNoAuth})
+	if err != nil {
+		log.Println("Failed to select method from", conn.RemoteAddr(), ":", err)
+		return
+	}
+
+	// Do something with request
+	n, err = s.Read(buf)
+	if err == nil {
+		if n < 10 {
+			err = fmt.Errorf("request message too short")
+		} else if buf[0] != socks5 {
+			err = fmt.Errorf("not SOCKS5 protocol")
+		}
+	}
+	if err != nil {
+		log.Println("Failed to handle request from", conn.RemoteAddr(), ":", err)
+		return
+	}
+
+	// Helper function for sending reply
+	reply := func(rep byte) {
+		_, _ = s.Write([]byte{socks5, rep, reserved, addressIPv4,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+	}
+
+	// We only support connect
+	if buf[1] != commandConnect {
+		log.Println("Unsupported command from", conn.RemoteAddr(), ":", err)
+		reply(replyCommandNotSupported)
+		return
+	}
+
+	var host string
+	switch buf[3] {
+	case addressIPv4:
+		host = net.IP(buf[4 : 4+net.IPv4len]).String()
+	case addressIPv6:
+		host = net.IP(buf[4 : 4+net.IPv6len]).String()
+	case addressDomainName:
+		host = string(buf[5 : n-2])
+	default:
+		reply(replyAddressNotSupported)
+		return
+	}
+	port := int(binary.BigEndian.Uint16(buf[n-2:]))
+	dst, err := net.Dial("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+	if err != nil {
+		log.Println("General failure when dialing", net.JoinHostPort(host, strconv.Itoa(port)), ":", err)
+		reply(replyGeneralFailure)
+		return
+	}
+	defer Close(dst)
+	reply(replySuccess)
+	log.Println("Begin piping from", dst.RemoteAddr().String(), "to", conn.RemoteAddr().String())
+	pipeBetween(s, dst)
+}
