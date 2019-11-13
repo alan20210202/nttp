@@ -31,16 +31,6 @@ const (
 	addressIPv6       = 0x04
 )
 
-func hasMethod(msg []byte, method byte) bool {
-	n := int(msg[1])
-	for _, m := range msg[2 : 2+n] {
-		if m == method {
-			return true
-		}
-	}
-	return false
-}
-
 func pipeBetween(a io.ReadWriter, b io.ReadWriter) {
 	done := make(chan bool, 2)
 	go func() { _, _ = io.Copy(a, b); done <- true }()
@@ -70,21 +60,21 @@ func ListenAsClient(local, server string) {
 		}
 		go func() {
 			defer Close(connLocal)
-			log.Println("Accepted socks client connection from", connLocal.RemoteAddr().String())
+			log.Println("Accepted SOCKS client connection from", connLocal.RemoteAddr().String())
 			connServer, err := net.Dial("tcp", server)
 			if err != nil {
 				log.Println(err)
 				return
 			}
 			defer Close(connServer)
-			log.Println("Begin piping from", connLocal.RemoteAddr().String(), "to", connServer.RemoteAddr().String())
+			log.Println("Established NTT relay from", connLocal.RemoteAddr().String(), "to", connServer.RemoteAddr().String())
 			pipeBetween(connLocal, newNTTReadWriter(connServer))
-			log.Println("Done with", connLocal.RemoteAddr().String())
+			log.Println("Finished relay with", connLocal.RemoteAddr().String())
 		}()
 	}
 }
 
-func ListenAsServer(addr string) {
+func ListenAsServer(addr, selfAddr string) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatal(err)
@@ -100,12 +90,41 @@ func ListenAsServer(addr string) {
 		go func() {
 			log.Println("Accepted socks relay connection from", conn.RemoteAddr().String())
 			defer Close(conn)
-			handleSocks5Conn(conn)
+			handleSocks5Conn(conn, selfAddr)
 		}()
 	}
 }
 
-func handleSocks5Conn(conn net.Conn) {
+func hasMethod(msg []byte, method byte) bool {
+	n := int(msg[1])
+	for _, m := range msg[2 : 2+n] {
+		if m == method {
+			return true
+		}
+	}
+	return false
+}
+
+func encodeAddr(addr string) []byte {
+	ip := net.ParseIP(addr)
+	if ip != nil {
+		switch len(ip) {
+		case net.IPv4len:
+			return append([]byte{addressIPv4}, ip...)
+		case net.IPv6len:
+			return append([]byte{addressIPv6}, ip...)
+		}
+	}
+	return append([]byte{addressDomainName, byte(len(addr))}, addr...)
+}
+
+func encodeAddrAndPort(addr string, port int) []byte {
+	buf := make([]byte, 2)
+	binary.BigEndian.PutUint16(buf, uint16(port))
+	return append(encodeAddr(addr), buf...)
+}
+
+func handleSocks5Conn(conn net.Conn, selfAddr string) {
 	buf := make([]byte, 2*BlockDataSize)
 	s := newNTTReadWriter(conn)
 	// Checks the greeting message from the client
@@ -156,34 +175,60 @@ func handleSocks5Conn(conn net.Conn) {
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 	}
 
-	// We only support connect
-	if buf[1] != commandConnect {
-		log.Println("Unsupported command from", conn.RemoteAddr(), ":", err)
-		reply(replyCommandNotSupported)
-		return
-	}
-
-	var host string
+	// Resolve address
+	var dstAddr string
 	switch buf[3] {
 	case addressIPv4:
-		host = net.IP(buf[4 : 4+net.IPv4len]).String()
+		dstAddr = net.IP(buf[4 : 4+net.IPv4len]).String()
 	case addressIPv6:
-		host = net.IP(buf[4 : 4+net.IPv6len]).String()
+		dstAddr = net.IP(buf[4 : 4+net.IPv6len]).String()
 	case addressDomainName:
-		host = string(buf[5 : n-2])
+		dstAddr = string(buf[5 : n-2])
 	default:
 		reply(replyAddressNotSupported)
 		return
 	}
-	port := int(binary.BigEndian.Uint16(buf[n-2:]))
-	dst, err := net.Dial("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
-	if err != nil {
-		log.Println("General failure when dialing", net.JoinHostPort(host, strconv.Itoa(port)), ":", err)
-		reply(replyGeneralFailure)
-		return
+	dstPort := int(binary.BigEndian.Uint16(buf[n-2:]))
+
+	switch buf[1] {
+	case commandConnect:
+		dst, err := net.Dial("tcp", net.JoinHostPort(dstAddr, strconv.Itoa(dstPort)))
+		if err != nil {
+			log.Println("General failure when dialing", net.JoinHostPort(dstAddr, strconv.Itoa(dstPort)), ":", err)
+			reply(replyGeneralFailure)
+			return
+		}
+		defer Close(dst)
+		reply(replySuccess)
+		log.Println("Established NTT relay from", dst.RemoteAddr().String(), "to", conn.RemoteAddr().String())
+		pipeBetween(s, dst)
+	case commandBind:
+		l, err := net.Listen("tcp", ":0")
+		if err != nil {
+			reply(replyGeneralFailure)
+			log.Println(err)
+			return
+		}
+		defer Close(l)
+		log.Println("Listening as told by BIND request on", l.Addr().String())
+		listenPort := l.Addr().(*net.TCPAddr).Port
+		_, _ = s.Write(append([]byte{socks5, replySuccess, reserved},
+			encodeAddrAndPort(selfAddr, listenPort)...))
+		coming, err := l.Accept()
+		if err != nil {
+			reply(replyGeneralFailure)
+			log.Println(err)
+			return
+		}
+		// TODO: Check here if comingAddr and comingPort matches with dstAddr and dstPort
+		comingAddr := coming.RemoteAddr().(*net.TCPAddr).IP
+		comingPort := coming.RemoteAddr().(*net.TCPAddr).Port
+		_, _ = s.Write(append([]byte{socks5, replySuccess, reserved},
+			encodeAddrAndPort(comingAddr.String(), comingPort)...))
+		log.Println("Established NTT relay from", coming.RemoteAddr().String(), "to", conn.RemoteAddr().String())
+		pipeBetween(s, coming)
+	default:
+		log.Println("Unsupported command from", conn.RemoteAddr(), ":", err)
+		reply(replyCommandNotSupported)
 	}
-	defer Close(dst)
-	reply(replySuccess)
-	log.Println("Begin piping from", dst.RemoteAddr().String(), "to", conn.RemoteAddr().String())
-	pipeBetween(s, dst)
 }
