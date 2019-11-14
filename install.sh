@@ -40,19 +40,20 @@ echo Building...
 go build -o "$bin_path" "$src_path"
 
 echo Creating symbolic link...
+rm $install_path
 ln -s "$bin_path" "$install_path"
 
 # shellcheck disable=SC2039
 read -r -p "Register systemd service? [Y/n] " yn
-${yn:=y}
+yn="${yn:-Y}"
 case $yn in
   [Yy]* )
     # shellcheck disable=SC2039
     read -r -p "Listen on: [:44353]" listen
-    ${listen:=:44353}
+    listen="${listen:-:44353}"
     # shellcheck disable=SC2039
     read -r -p "Public address: [0.0.0.0]" pubaddr
-    ${pubaddr:=0.0.0.0}
+    pubaddr="${pubaddr:-0.0.0.0}"
 
     mkdir -p "/usr/lib/systemd/system"
     service_path="/usr/lib/systemd/system/nttp.service"
