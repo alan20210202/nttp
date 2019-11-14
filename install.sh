@@ -43,16 +43,18 @@ echo Creating symbolic link...
 ln -s "$bin_path" "$install_path"
 
 # shellcheck disable=SC2039
-read -r -p "Register systemd service?" yn
+read -r -p "Register systemd service? [Y/n] " yn
+${yn:=y}
 case $yn in
   [Yy]* )
     # shellcheck disable=SC2039
-    read -r -p "Listen on [0.0.0.0:44353]: " listen
-    ${listen:="0.0.0.0:44353"}
+    read -r -p "Listen on: [:44353]" listen
+    ${listen:=:44353}
     # shellcheck disable=SC2039
-    read -r -p "Public address [0.0.0.0]: " pubaddr
-    ${pubaddr:="0.0.0.0"}
+    read -r -p "Public address: [0.0.0.0]" pubaddr
+    ${pubaddr:=0.0.0.0}
 
+    mkdir -p "/usr/lib/systemd/system"
     service_path="/usr/lib/systemd/system/nttp.service"
     echo "[Unit]" > "$service_path"
     echo "Description=NTTP Server Service" >> "$service_path"
