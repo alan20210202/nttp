@@ -69,8 +69,14 @@ sufficient for most occasions).
 do if they observe regular 0, 1 and 2s in the data stream?) This is to be improved.
 3. Extra network usage due to "overflow" (for about 1%, which is pretty acceptable).
 
+# Installation
+
+To install nttp, `git clone` this repo, `cd` into the folder, and then `sudo ./install.sh`, the script will install nttp and setup systemd services. 
+You may need to provide the public address of your server to make Bind request of SOCKS
+functional, but it is not necessary since Connect will be used 99.9% of the times.
+
 # WIP
- - [ ] Full SOCKS support -- currently only the Connect command is implemented
+ - [ ] Full SOCKS support -- currently only the Connect and Bind command is implemented
  - [ ] Incorporate keys - making it a real encryption scheme instead of merely a "transform" 
  - [ ] Make overflow bits less noticeable
  - [ ] Android client
