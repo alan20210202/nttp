@@ -56,16 +56,20 @@ case $yn in
     pubaddr="${pubaddr:-0.0.0.0}"
 
     echo Listening on "$listen" with public address "$pubaddr"
+    systemctl stop nttp.service
+    systemctl disable nttp.service
     mkdir -p "/usr/lib/systemd/system"
     service_path="/usr/lib/systemd/system/nttp.service"
     echo "[Unit]" > "$service_path"
     echo "Description=NTTP Server Service" >> "$service_path"
     echo >> "$service_path"
     echo "[Service]" >> "$service_path"
-    echo "ExecStart=$install_path server -l $listen -s $pubaddr" >> "$service_path"
+    echo "ExecStart=$install_path server --listen $listen --self $pubaddr" >> "$service_path"
     echo >> "$service_path"
     echo "[Install]" >> "$service_path"
     echo "WantedBy=multi-user.target" >> "$service_path"
+    systemctl start nttp.service
+    systemctl enable nttp.service
     ;;
   [Nn]* )
     echo Cancelled systemd service registration!
