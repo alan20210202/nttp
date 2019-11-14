@@ -1,19 +1,26 @@
+**THIS PROGRAM IS WRITTEN ONLY FOR THE PURPOSE OF LEARNING.**
+
+**DO NOT SPREAD THIS PROGRAM. KEEPING IT UNPOPULAR IS THE BEST WAY TO ENSURE ITS FUNCTIONALITY.**
 # NTTP
 
 NTTP = *N*umber *T*heoretic *T*ransform *P*roxy
 
 Inspired by what I've learnt in OI. This is a personal project that 
-employs NTT on the data to hide the original characteristics of the 
+employs NTT on the data to obscure the original characteristics of the 
 underlying protocol.
 
-Since encryption is still WIP, the program now simply NTT the raw data.
-This is against the golden rule in cryptography that "the security of 
-an encryption scheme comes from the key instead of the algorithm itself"...
+Since encryption is still WIP, the program now simply NTT the raw data. 
 
-Well, since those popular encryption schemes (and popular proxies that utilize them) 
-can all be recognized by the GFW. In this case a home-brewed "encryption"
-scheme may be a good idea (provided that the GFW won't spend too much effort on breaking
-a proxy used by only one person!)
+**THIS SHOULD NEVER BE SEEN AS A "SECURE" PROXY!** NTT, as its name suggests
+, is merely a *transformation*, not an *encryption scheme*. It is against 
+the famous Kerckhoff's Principle. In other words, the functionality and "security"
+of this program is based on the assumption that "the enemy doesn't know the
+system", which is further based on my assumption that GFW won't spend efforts
+investigating and breaking a proxy used by only a few people!
+
+**NTTP IS JUST A PERSONAL WORKAROUND TO GFW's EFFECTIVE BLOCKADE OF POPULAR
+PROXIES. IT IS NO MORE THAN A TOY. IT OFFERS NO ADVANCED FEATURES. IT
+DOESN'T EVEN SUPPORT FULL SOCKS PROTOCOL AS STATED IN RFC1928.**
 
 # What the program does
 
@@ -73,7 +80,7 @@ do if they observe regular 0, 1 and 2s in the data stream?) This is to be improv
 
 To install nttp, `git clone` this repo, `cd` into the folder, and then `sudo ./install.sh`, the script will install nttp and setup systemd services. 
 You may need to provide the public address of your server to make Bind request of SOCKS
-functional, but it is not necessary since Connect will be used 99.9% of the times.
+functional, but it is not necessary since Connect will be used 99.9% of the time.
 
 # WIP
  - [ ] Full SOCKS support -- currently only the Connect and Bind command is implemented
