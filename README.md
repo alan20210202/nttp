@@ -7,7 +7,7 @@ NTTP = *N*umber *T*heoretic *T*ransform *P*roxy
 
 Inspired by what I've learnt in OI. This is a personal project that 
 employs NTT on the data to obscure the original characteristics of the 
-underlying protocol.
+underlying protocol (SOCKS5).
 
 Since encryption is still WIP, the program now simply NTT the raw data. 
 
@@ -24,7 +24,8 @@ DOESN'T EVEN SUPPORT FULL SOCKS PROTOCOL AS STATED IN RFC1928.**
 
 # What the program does
 
-Basically NTT here means for some sequence <img src="https://latex.codecogs.com/svg.latex?\inline&space;\dpi{300}&space;\{x_i\}_{i=0}^{n-1}" title="\{x_i\}_{i = 0}^{n-1}" />:
+Number Theoretic Transform is a transformation applied on some sequence <img src="https://latex.codecogs.com/svg.latex?\inline&space;\dpi{300}&space;\{x_i\}_{i=0}^{n-1}" title="\{x_i\}_{i = 0}^{n-1}" />
+resulting in a sequence <img src="https://latex.codecogs.com/svg.latex?\inline&space;\dpi{300}&space;\{X_i\}_{i=0}^{n-1}" title="\{X_i\}_{i = 0}^{n-1}" />:
 
 <img src="https://latex.codecogs.com/svg.latex?\dpi{300}&space;X_j=\sum_{i=0}^{n-1}x_i\omega^{ij}" title="X_j=\sum_{i=0}^{n-1}x_i\omega^{ij}" />
 

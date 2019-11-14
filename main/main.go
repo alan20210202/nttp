@@ -10,7 +10,7 @@ import (
 func main() {
 	app := cli.NewApp()
 	app.Name = "nttp"
-	app.Usage = "NTT-coated SOCKS5 client/server"
+	app.Usage = "Number Theoretic Transform SOCKS5 client/server"
 	app.Version = "998.244.353"
 	app.Commands = []*cli.Command{
 		{
