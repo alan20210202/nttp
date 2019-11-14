@@ -55,6 +55,7 @@ case $yn in
     read -r -p "Public address: [0.0.0.0]" pubaddr
     pubaddr="${pubaddr:-0.0.0.0}"
 
+    echo Listening on "$listen" with public address "$pubaddr"
     mkdir -p "/usr/lib/systemd/system"
     service_path="/usr/lib/systemd/system/nttp.service"
     echo "[Unit]" > "$service_path"
