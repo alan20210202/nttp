@@ -44,7 +44,7 @@ rm $install_path
 ln -s "$bin_path" "$install_path"
 
 # shellcheck disable=SC2039
-read -r -p "Register systemd service? [Y/n] " yn
+read -r -p "Register systemd service (server-side)? [Y/n] " yn
 yn="${yn:-Y}"
 case $yn in
   [Yy]* )
@@ -70,6 +70,7 @@ case $yn in
     echo "WantedBy=multi-user.target" >> "$service_path"
     systemctl start nttp.service
     systemctl enable nttp.service
+    echo You can modify nttp arguments in "$service_path"/nttp.service
     ;;
   [Nn]* )
     echo Cancelled systemd service registration!
