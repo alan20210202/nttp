@@ -10,7 +10,7 @@ import (
 func main() {
 	app := cli.NewApp()
 	app.Name = "nttp"
-	app.Usage = "NTT-coated SOCKS client/server"
+	app.Usage = "NTT-coated SOCKS5 client/server"
 	app.Version = "998.244.353"
 	app.Commands = []*cli.Command{
 		{
@@ -18,12 +18,14 @@ func main() {
 			Usage: "Run nttp as client",
 			Flags: []cli.Flag{
 				&cli.StringFlag{
-					Name:     "listen, l",
+					Name:     "listen",
+					Aliases:  []string{"l"},
 					Usage:    "address on which nttp listens for incoming SOCKS requests",
 					Required: true,
 				},
 				&cli.StringFlag{
-					Name:     "remote, r",
+					Name:     "remote",
+					Aliases:  []string{"r"},
 					Usage:    "remote address",
 					Required: true,
 				},
@@ -38,14 +40,16 @@ func main() {
 			Usage: "Run nttp as server",
 			Flags: []cli.Flag{
 				&cli.StringFlag{
-					Name:     "listen, l",
+					Name:     "listen",
+					Aliases:  []string{"l"},
 					Usage:    "address on which nttp listens for clients",
 					Required: true,
 				},
 				&cli.StringFlag{
-					Name:  "self, s",
-					Value: "0.0.0.0",
-					Usage: "public address of the server",
+					Name:    "self",
+					Aliases: []string{"s"},
+					Value:   "0.0.0.0",
+					Usage:   "public address of the server",
 				},
 			},
 			Action: func(ctx *cli.Context) error {

@@ -45,13 +45,14 @@ func Close(c io.Closer) {
 	}
 }
 
-func ListenAsClient(local, server string) {
-	l, err := net.Listen("tcp", local)
+func ListenAsClient(listen, remote string) {
+	l, err := net.Listen("tcp", listen)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
 	defer Close(l)
+	log.Println("Listening for SOCKS5 connection on", l.Addr())
 	for {
 		connLocal, err := l.Accept()
 		if err != nil {
@@ -61,7 +62,7 @@ func ListenAsClient(local, server string) {
 		go func() {
 			defer Close(connLocal)
 			log.Println("Accepted SOCKS client connection from", connLocal.RemoteAddr().String())
-			connServer, err := net.Dial("tcp", server)
+			connServer, err := net.Dial("tcp", remote)
 			if err != nil {
 				log.Println(err)
 				return
@@ -74,13 +75,14 @@ func ListenAsClient(local, server string) {
 	}
 }
 
-func ListenAsServer(addr, selfAddr string) {
-	l, err := net.Listen("tcp", addr)
+func ListenAsServer(listen, self string) {
+	l, err := net.Listen("tcp", listen)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
 	defer Close(l)
+	log.Println("Listening for NTTP client connection on", l.Addr())
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -90,7 +92,7 @@ func ListenAsServer(addr, selfAddr string) {
 		go func() {
 			log.Println("Accepted socks relay connection from", conn.RemoteAddr().String())
 			defer Close(conn)
-			handleSocks5Conn(conn, selfAddr)
+			handleSocks5Conn(conn, self)
 		}()
 	}
 }
